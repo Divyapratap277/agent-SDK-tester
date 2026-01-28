@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import '../styles/IntelligenceDashboard.css';
 
-const IntelligenceDashboard = ({ intelligence, customerData }) => {
+const IntelligenceDashboard = ({ intelligence, customerData, sessionInfo }) => {
   const [activeTab, setActiveTab] = useState('email'); // Default tab
 
   if (!intelligence) {
@@ -372,9 +372,31 @@ const IntelligenceDashboard = ({ intelligence, customerData }) => {
           <h3 className="card-header">IP Location</h3>
           <div className="card-rows">
             <div className="data-row">
-              <span className="label">IP Address</span>
-              {renderValue(intelligence.ip.ip_hostname)}
-            </div>
+  <span className="label">IP Address</span>
+  <span className="value-default">
+    {intelligence.ip.ip_hostname || 'N/A'}
+    {sessionInfo?.selectedIP && sessionInfo?.ipSource && (
+      <span style={{
+        marginLeft: '10px',
+        padding: '4px 8px',
+        borderRadius: '4px',
+        fontSize: '0.75em',
+        fontWeight: '600',
+        backgroundColor: sessionInfo.ipSource === 'global' ? 'rgba(16, 185, 129, 0.2)' : 
+                         sessionInfo.ipSource === 'ipv4' ? 'rgba(245, 158, 11, 0.2)' : 
+                         sessionInfo.ipSource === 'ipv6' ? 'rgba(59, 130, 246, 0.2)' : 
+                         'rgba(239, 68, 68, 0.2)',
+        color: sessionInfo.ipSource === 'global' ? '#10b981' : 
+               sessionInfo.ipSource === 'ipv4' ? '#f59e0b' : 
+               sessionInfo.ipSource === 'ipv6' ? '#3b82f6' : 
+               '#ef4444'
+      }}>
+        {sessionInfo.ipSource.toUpperCase()}
+      </span>
+    )}
+  </span>
+</div>
+
             <div className="data-row">
               <span className="label">IP - Country</span>
               {renderValue(intelligence.ip.ip_country)}

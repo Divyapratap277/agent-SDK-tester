@@ -491,6 +491,19 @@ app.post('/api/save-sdk-data', async (req, res) => {
 
     console.log(`💾 [SDK] Saving data for session: ${sessionId}`);
 
+    // ✅✅✅ ADD THIS DEBUG BLOCK ✅✅✅
+    console.log('🐛 [DEBUG] === SDK DATA RECEIVED ===');
+    console.log('Total events:', sdkData?.length || 0);
+    
+    if (sdkData && Array.isArray(sdkData)) {
+      sdkData.forEach((event, idx) => {
+        console.log(`\n📦 Event ${idx + 1}: ${event.type}`);
+        console.log('   Payload:', JSON.stringify(event.payload, null, 2));
+      });
+    }
+    console.log('🐛 [DEBUG] === END SDK DATA ===\n');
+    // ✅✅✅ END DEBUG BLOCK ✅✅✅
+
     if (!sessionId) {
       return res.status(400).json({
         success: false,
@@ -575,29 +588,116 @@ app.post('/api/save-sdk-data', async (req, res) => {
       } else {
         const agentData = sessions[sessionId].agentData || {};
         
-        // ✅✅✅ PHONE INTELLIGENCE FIX #1: Format phone correctly ✅✅✅
+        // ✅ Format phone with country code
         let formattedPhone = '';
         if (agentData.phone) {
-          // Add +91 if not present
           formattedPhone = agentData.phone.startsWith('+') 
             ? agentData.phone 
             : `+91${agentData.phone}`;
         }
         
-        // ✅✅✅ PHONE INTELLIGENCE FIX #2: Get real IP address ✅✅✅
-        const userIP = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || '';
-        const cleanIP = userIP.replace('::ffff:', ''); // Remove IPv6 prefix
+        // ✅✅✅ IP SELECTION LOGIC - PRIORITY: Global IP > IPv4 > IPv6 ✅✅✅
+        let selectedIP = '';
+        let globalIP = null;
+        let ipv4 = null;
+        let ipv6 = null;
+        let localIP = null;
+        
+        // Extract all IPs from SDK data
+        // ✅✅✅ FIXED: Extract IPs from SDK data (check nested fingerprint) ✅✅✅
+if (sdkData && Array.isArray(sdkData)) {
+  sdkData.forEach(event => {
+    if (event.payload) {
+      // ✅ NEW: Check if this is DEVICE_ID event with fingerprint
+      if (event.type === 'DEVICE_ID' && event.payload.fingerprint && event.payload.fingerprint.ipAddresses) {
+        const ipData = event.payload.fingerprint.ipAddresses;
+        
+        globalIP = globalIP || ipData.globalIP;
+        ipv4 = ipv4 || ipData.ipv4;
+        ipv6 = ipv6 || ipData.ipv6;
+        localIP = localIP || ipData.localIP;
+        
+        console.log('✅ [IP] Found in DEVICE_ID.fingerprint.ipAddresses');
+      }
+      
+      // ✅ ALSO: Check direct payload fields (backward compatibility)
+      if (event.payload.globalIP || event.payload.global_ip) {
+        globalIP = globalIP || event.payload.globalIP || event.payload.global_ip;
+      }
+      if (event.payload.ipv4 || event.payload.IPv4) {
+        ipv4 = ipv4 || event.payload.ipv4 || event.payload.IPv4;
+      }
+      if (event.payload.ipv6 || event.payload.IPv6) {
+        ipv6 = ipv6 || event.payload.ipv6 || event.payload.IPv6;
+      }
+      if (event.payload.localIP || event.payload.local_ip) {
+        localIP = localIP || event.payload.localIP || event.payload.local_ip;
+      }
+      
+      // Also check nested ip object
+      if (event.payload.ip) {
+        if (typeof event.payload.ip === 'string') {
+          globalIP = globalIP || event.payload.ip;
+        } else if (typeof event.payload.ip === 'object') {
+          globalIP = globalIP || event.payload.ip.global || event.payload.ip.globalIP;
+          ipv4 = ipv4 || event.payload.ip.ipv4 || event.payload.ip.IPv4;
+          ipv6 = ipv6 || event.payload.ip.ipv6 || event.payload.ip.IPv6;
+          localIP = localIP || event.payload.ip.local || event.payload.ip.localIP;
+        }
+      }
+    }
+  });
+  
+  console.log('🌐 [IP DEBUG] All IPs extracted from SDK:');
+  console.log('  Global IP:', globalIP || 'null');
+  console.log('  IPv4:', ipv4 || 'null');
+  console.log('  IPv6:', ipv6 || 'null');
+  console.log('  Local IP:', localIP || 'null');
+}
+
+        
+        // ✅ Apply priority selection logic
+        // 1. Try Global IP first (best for fraud detection & geolocation)
+        if (globalIP && globalIP !== 'null' && globalIP !== '' && globalIP !== '0.0.0.0' && globalIP !== 'undefined') {
+          selectedIP = globalIP;
+          sessions[sessionId].ipSource = 'global';
+          console.log('✅ [IP SELECTED] Using Global IP:', selectedIP);
+        }
+        // 2. Fallback to IPv4
+        else if (ipv4 && ipv4 !== 'null' && ipv4 !== '' && ipv4 !== '0.0.0.0' && ipv4 !== 'undefined') {
+          selectedIP = ipv4;
+          sessions[sessionId].ipSource = 'ipv4';
+          console.log('⚠️ [IP SELECTED] Using IPv4 (Global IP not available):', selectedIP);
+        }
+        // 3. Fallback to IPv6
+        else if (ipv6 && ipv6 !== 'null' && ipv6 !== '' && ipv6 !== '::' && ipv6 !== 'undefined') {
+          selectedIP = ipv6;
+          sessions[sessionId].ipSource = 'ipv6';
+          console.log('⚠️ [IP SELECTED] Using IPv6 (IPv4 not available):', selectedIP);
+        }
+        // 4. Last resort: backend IP (NOT RECOMMENDED - will be localhost)
+        else {
+          selectedIP = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || '';
+          selectedIP = selectedIP.replace('::ffff:', '');
+          sessions[sessionId].ipSource = 'backend';
+          console.warn('❌ [IP SELECTED] No SDK IP found! Using backend IP:', selectedIP);
+          console.warn('❌ [WARNING] Backend IP is likely "localhost" - Scoreplex will not work properly!');
+        }
+        
+        // Store selected IP in session
+        sessions[sessionId].selectedIP = selectedIP;
         
         const scoreplexPayload = {
           email: agentData.email || '',
-          phone: formattedPhone,  // ✅ Fixed: Use formatted phone with country code
-          ip: cleanIP,  // ✅ Fixed: Use real IP address, not coordinates
+          phone: formattedPhone,
+          ip: selectedIP,  // ✅ Use selected IP with priority logic
           first_name: agentData.firstName || agentData.customerName?.split(' ')[0] || '',
           last_name: agentData.lastName || agentData.customerName?.split(' ').slice(1).join(' ') || '',
           verification: true
         };
 
         console.log('📤 [SCOREPLEX] Payload:', JSON.stringify(scoreplexPayload, null, 2));
+        console.log('📤 [SCOREPLEX] IP Source:', sessions[sessionId].ipSource);
 
         const scoreplexResponse = await axios.post(
           `https://api.scoreplex.io/api/v1/search`,
@@ -615,6 +715,7 @@ app.post('/api/save-sdk-data', async (req, res) => {
         if (scoreplexResponse.data && scoreplexResponse.data.id) {
           sessions[sessionId].scoreplexTaskId = scoreplexResponse.data.id;
           console.log(`✅ [SCOREPLEX] Task created: ${scoreplexResponse.data.id}`);
+          console.log(`✅ [SCOREPLEX] Submitted with IP: ${selectedIP} (Source: ${sessions[sessionId].ipSource})`);
         }
       }
     } catch (scoreplexError) {
@@ -639,6 +740,7 @@ app.post('/api/save-sdk-data', async (req, res) => {
     });
   }
 });
+
 
 // ==========================================
 // ✅ CHECK VERIFICATION STATUS
@@ -862,17 +964,21 @@ app.get('/api/dashboard-data/:sessionId', async (req, res) => {
     console.log(`✅ [DASHBOARD] Data prepared for session: ${sessionId}`);
 
     res.json({
-      success: true,
-      customerData: session.agentData || {},
-      intelligence: intelligence,
-      sessionInfo: {
-        sessionId: session.sessionId,
-        createdAt: session.createdAt,
-        updatedAt: session.updatedAt,
-        hasScoreplex: !!session.scoreplexTaskId,
-        hasSDK: !!(session.sdkData && session.sdkData.length > 0)
-      }
-    });
+  success: true,
+  customerData: session.agentData || {},
+  intelligence: intelligence,
+  sessionInfo: {
+    sessionId: session.sessionId,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    hasScoreplex: !!session.scoreplexTaskId,
+    hasSDK: !!(session.sdkData && session.sdkData.length > 0),
+    // ✅ Add selected IP info
+    selectedIP: session.selectedIP || 'N/A',
+    ipSource: session.ipSource || 'unknown'  // global, ipv4, ipv6, or backend
+  }
+});
+
 
   } catch (error) {
     console.error('❌ [DASHBOARD] Error:', error.message);

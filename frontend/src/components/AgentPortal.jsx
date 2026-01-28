@@ -126,11 +126,14 @@ const AgentPortal = () => {
       console.log('   - Customer Data:', data.customerData?.customerName);
       console.log('   - SDK Events:', data.intelligence?.sdkData?.length || 0);
       console.log('   - Has Distance:', data.intelligence?.sdkData?.some(e => e.type === 'AGENT_USER_DISTANCE') || false);
+      console.log('   - Session Info:', data.sessionInfo);  // ✅ NEW: Debug log
+      console.log('   - IP Source:', data.sessionInfo?.ipSource);  // ✅ NEW: Debug log
       
       // ✅ Prepare data for IntelligenceDashboard component
       setDashboardData({
         customerData: data.customerData || customerData, // Use backend data, fallback to form data
-        intelligence: data.intelligence // Includes sdkData, email, phone, ip, darknet, scores
+        intelligence: data.intelligence, // Includes sdkData, email, phone, ip, darknet, scores
+         sessionInfo: data.sessionInfo
       });
       
       setShowDashboard(true);
@@ -289,6 +292,7 @@ try {
     <IntelligenceDashboard 
       intelligence={dashboardData.intelligence} 
       customerData={dashboardData.customerData}
+      sessionInfo={dashboardData.sessionInfo} 
     />
   );
 }
