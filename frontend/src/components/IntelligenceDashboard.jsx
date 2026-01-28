@@ -64,24 +64,26 @@ const IntelligenceDashboard = ({ intelligence, customerData }) => {
   ];
 
   // Render content based on active tab
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'email':
-        return renderEmailIntelligence();
-      case 'phone':
-        return renderPhoneIntelligence();
-      case 'ip':
-        return renderIPIntelligence();
-      case 'darknet':
-        return renderDarknetIntelligence();
-      case 'sdk':
-        return renderSDKData(); // NEW!
-      case 'overview':
-        return renderOverview();
-      default:
-        return <div>Select a category</div>;
-    }
-  };
+  const renderContent = () => { 
+  switch (activeTab) {
+    case 'overview':
+      return renderOverview();
+    case 'email':
+      return renderEmailIntelligence();
+    case 'phone':
+      return renderPhoneIntelligence();
+    case 'ip':
+      return renderIPIntelligence();
+    case 'darknet':
+      return renderDarknetIntelligence();
+    case 'social':  // ✅ ADD THIS CASE
+      return renderSocialMedia();
+    case 'sdk':
+      return renderSDKData();
+    default:
+      return <div>Select a category</div>;
+  }
+};
 
   // Email Intelligence Content
   const renderEmailIntelligence = () => (
@@ -587,6 +589,93 @@ const IntelligenceDashboard = ({ intelligence, customerData }) => {
       </div>
     </div>
   );
+
+
+  // ✅✅✅ ADD SOCIAL MEDIA FUNCTION HERE ✅✅✅
+const renderSocialMedia = () => {
+  console.log('🚀 [SOCIAL] === FULL DEBUG MODE ===');
+  
+  const slData = intelligence?.darknet?.sl_data || {};
+  
+  // Show EVERYTHING in sl_data
+  console.log('🔍 [FULL sl_data]:', slData);
+  
+  // Check each key individually
+  Object.keys(slData).forEach(key => {
+    console.log(`📦 [sl_data.${key}]:`, slData[key]);
+    console.log(`   Type: ${Array.isArray(slData[key]) ? 'Array' : typeof slData[key]}`);
+    if (Array.isArray(slData[key])) {
+      console.log(`   Length: ${slData[key].length}`);
+      if (slData[key].length > 0) {
+        console.log(`   First item:`, slData[key][0]);
+      }
+    }
+  });
+  
+  // Maybe social media is in accounts but with different structure?
+  const accounts = slData.accounts || [];
+  console.log('🔍 accounts:', accounts);
+  
+  // Check if ANY array has data that looks like social media
+  const possibleSocialArrays = ['accounts', 'aliases', 'full_names', 'phones', 'emails'];
+  possibleSocialArrays.forEach(arrayName => {
+    if (slData[arrayName] && Array.isArray(slData[arrayName]) && slData[arrayName].length > 0) {
+      console.log(`✅ ${arrayName} has data:`, slData[arrayName]);
+    }
+  });
+  
+  return (
+    <div className="content-section">
+      <h2 className="content-title">🌐 Social Media Profiles - FULL DEBUG</h2>
+      
+      <div className="content-card">
+        <h3 className="card-header">🐛 Raw Data Structure</h3>
+        <div className="card-rows">
+          {Object.keys(slData).map(key => (
+            <div key={key} className="data-row">
+              <span className="label">{key}</span>
+              <span className="value-default">
+                {Array.isArray(slData[key]) 
+                  ? `Array[${slData[key].length}]: ${JSON.stringify(slData[key]).substring(0, 100)}...`
+                  : typeof slData[key] === 'object'
+                  ? JSON.stringify(slData[key]).substring(0, 100) + '...'
+                  : String(slData[key])}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Show each array */}
+      {Object.keys(slData).map(key => {
+        if (!Array.isArray(slData[key]) || slData[key].length === 0) return null;
+        
+        return (
+          <div key={key} className="content-card">
+            <h3 className="card-header">
+              📋 {key} ({slData[key].length} items)
+            </h3>
+            <div className="card-rows">
+              {slData[key].slice(0, 3).map((item, idx) => (
+                <div key={idx} className="data-row">
+                  <span className="label">Item {idx + 1}</span>
+                  <span className="value-default">
+                    {typeof item === 'object' 
+                      ? JSON.stringify(item)
+                      : String(item)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+
+
 
   // ========================================
   // NEW: SDK DATA RENDER FUNCTION

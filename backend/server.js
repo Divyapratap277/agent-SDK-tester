@@ -10,12 +10,12 @@ const app = express();
 // ==========================================
 // MIDDLEWARE
 // ==========================================
-app.use(cors()); // Allow frontend to call backend
-app.use(express.json()); // Parse JSON requests
+app.use(cors());
+app.use(express.json());
 
 app.use('/api/map', mapRoutes);
 
-// ✅ NEW: In-memory session storage (use database in production)
+// ✅ In-memory session storage
 const sessions = {};
 
 // ==========================================
@@ -24,7 +24,6 @@ const sessions = {};
 const MAPPLS_ACCESS_TOKEN = process.env.MAPPLS_ACCESS_TOKEN;
 const PORT = process.env.PORT || 3000;
 
-// Check if API key is loaded
 if (!MAPPLS_ACCESS_TOKEN) {
   console.warn('⚠️ WARNING: MAPPLS_ACCESS_TOKEN not found');
 }
@@ -192,7 +191,7 @@ app.post('/api/geocode', async (req, res) => {
 });
 
 // ==========================================
-// DISTANCE CALCULATION ENDPOINT (BANK DISTANCE)
+// DISTANCE CALCULATION ENDPOINT
 // ==========================================
 app.post('/api/calculate-distance', async (req, res) => {
   try {
@@ -313,7 +312,7 @@ app.post('/api/calculate-distance', async (req, res) => {
 });
 
 // ==========================================
-// CALCULATE AGENT-USER DISTANCE WITH MAP
+// CALCULATE AGENT-USER DISTANCE
 // ==========================================
 app.post('/api/calculate-agent-user-distance', async (req, res) => {
   try {
@@ -484,10 +483,7 @@ app.post('/api/calculate-agent-user-distance', async (req, res) => {
 });
 
 // ==========================================
-// ✅ NEW: SAVE SDK DATA FROM USER'S DEVICE
-// ==========================================
-// ==========================================
-// ✅ SAVE SDK DATA FROM USER'S DEVICE + CALCULATE DISTANCE
+// ✅ SAVE SDK DATA + CALCULATE DISTANCE
 // ==========================================
 app.post('/api/save-sdk-data', async (req, res) => {
   try {
@@ -502,7 +498,6 @@ app.post('/api/save-sdk-data', async (req, res) => {
       });
     }
 
-    // Store or update session data
     if (!sessions[sessionId]) {
       sessions[sessionId] = {
         sessionId,
@@ -516,7 +511,6 @@ app.post('/api/save-sdk-data', async (req, res) => {
 
     console.log(`✅ [SDK] Data saved. Total events: ${sdkData?.length || 0}`);
 
-    // ✅ NEW: Extract user location from SDK data
     const deviceLocationEvent = sdkData?.find(event => event.type === 'DEVICE_LOCATION');
     const userLocation = deviceLocationEvent?.payload;
 
@@ -526,7 +520,6 @@ app.post('/api/save-sdk-data', async (req, res) => {
       console.log(`   Address: ${userLocation.address?.formattedAddress}`);
     }
 
-    // ✅ NEW: Calculate distance if we have both agent and user locations
     const agentData = sessions[sessionId].agentData;
     
     if (userLocation && agentData?.latitude && agentData?.longitude) {
@@ -535,7 +528,6 @@ app.post('/api/save-sdk-data', async (req, res) => {
       console.log(`   User: ${userLocation.latitude}, ${userLocation.longitude}`);
 
       try {
-        // Call internal distance calculation endpoint
         const distanceResponse = await axios.post(
           `http://localhost:${PORT}/api/calculate-agent-user-distance`,
           {
@@ -551,7 +543,6 @@ app.post('/api/save-sdk-data', async (req, res) => {
         );
 
         if (distanceResponse.data.success) {
-          // Add distance data to SDK events
           const distanceData = distanceResponse.data;
           
           sessions[sessionId].sdkData.push({
@@ -571,10 +562,6 @@ app.post('/api/save-sdk-data', async (req, res) => {
       }
     } else {
       console.warn('⚠️ [DISTANCE] Cannot calculate - missing location data');
-      if (!userLocation) console.log('   Missing: User location from SDK');
-      if (!agentData) console.log('   Missing: Agent data from form');
-      if (!agentData?.latitude) console.log('   Missing: Agent latitude');
-      if (!agentData?.longitude) console.log('   Missing: Agent longitude');
     }
 
     // ✅ Submit to Scoreplex
@@ -588,13 +575,25 @@ app.post('/api/save-sdk-data', async (req, res) => {
       } else {
         const agentData = sessions[sessionId].agentData || {};
         
-        // Prepare Scoreplex request
+        // ✅✅✅ PHONE INTELLIGENCE FIX #1: Format phone correctly ✅✅✅
+        let formattedPhone = '';
+        if (agentData.phone) {
+          // Add +91 if not present
+          formattedPhone = agentData.phone.startsWith('+') 
+            ? agentData.phone 
+            : `+91${agentData.phone}`;
+        }
+        
+        // ✅✅✅ PHONE INTELLIGENCE FIX #2: Get real IP address ✅✅✅
+        const userIP = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || '';
+        const cleanIP = userIP.replace('::ffff:', ''); // Remove IPv6 prefix
+        
         const scoreplexPayload = {
           email: agentData.email || '',
-          phone: agentData.phoneNumber || '',
-          ip: userLocation?.address?.latitude ? `${userLocation.address.latitude},${userLocation.address.longitude}` : '',
-          first_name: agentData.customerName?.split(' ')[0] || '',
-          last_name: agentData.customerName?.split(' ').slice(1).join(' ') || '',
+          phone: formattedPhone,  // ✅ Fixed: Use formatted phone with country code
+          ip: cleanIP,  // ✅ Fixed: Use real IP address, not coordinates
+          first_name: agentData.firstName || agentData.customerName?.split(' ')[0] || '',
+          last_name: agentData.lastName || agentData.customerName?.split(' ').slice(1).join(' ') || '',
           verification: true
         };
 
@@ -620,6 +619,9 @@ app.post('/api/save-sdk-data', async (req, res) => {
       }
     } catch (scoreplexError) {
       console.error('❌ [SCOREPLEX] Submit error:', scoreplexError.message);
+      if (scoreplexError.response) {
+        console.error('❌ [SCOREPLEX] Response:', scoreplexError.response.data);
+      }
     }
 
     res.json({
@@ -638,9 +640,8 @@ app.post('/api/save-sdk-data', async (req, res) => {
   }
 });
 
-
 // ==========================================
-// ✅ NEW: CHECK VERIFICATION STATUS (FOR POLLING)
+// ✅ CHECK VERIFICATION STATUS
 // ==========================================
 app.get('/api/check-verification/:sessionId', (req, res) => {
   try {
@@ -672,16 +673,7 @@ app.get('/api/check-verification/:sessionId', (req, res) => {
 });
 
 // ==========================================
-// ✅ NEW: GET DASHBOARD DATA WITH SCOREPLEX INTELLIGENCE
-// ==========================================
-// ==========================================
-// ✅ GET DASHBOARD DATA WITH SCOREPLEX INTELLIGENCE
-// ==========================================
-// ==========================================
-// ✅ GET DASHBOARD DATA WITH SCOREPLEX INTELLIGENCE + SDK DATA
-// ==========================================
-// ==========================================
-// ✅ GET DASHBOARD DATA WITH SCOREPLEX INTELLIGENCE + SDK DATA
+// ✅ GET DASHBOARD DATA WITH SCOREPLEX
 // ==========================================
 app.get('/api/dashboard-data/:sessionId', async (req, res) => {
   try {
@@ -698,14 +690,6 @@ app.get('/api/dashboard-data/:sessionId', async (req, res) => {
       });
     }
 
-    // ✅ DEBUG LOGS - Check what's in session
-    console.log('📊 [DASHBOARD] Session data check:');
-    console.log('   session.sdkData exists?', !!session.sdkData);
-    console.log('   session.sdkData is array?', Array.isArray(session.sdkData));
-    console.log('   session.sdkData length:', session.sdkData?.length);
-    console.log('   session.agentData exists?', !!session.agentData);
-
-    // ✅ Initialize intelligence with SDK data from session
     let intelligence = {
       email: {},
       phone: {},
@@ -713,13 +697,16 @@ app.get('/api/dashboard-data/:sessionId', async (req, res) => {
       darknet: {},
       overallScore: 0,
       scoreplexData: null,
-      sdkData: session.sdkData || [] // ✅ Set SDK data once here
+      sdkData: session.sdkData || []
     };
 
-    // ✅ Fetch Scoreplex results if task exists
     if (session.scoreplexTaskId) {
       try {
         console.log(`🔍 [SCOREPLEX] Fetching results for task: ${session.scoreplexTaskId}`);
+        
+        // ✅ Wait 3 seconds for Scoreplex to process
+        console.log('⏳ Waiting 3 seconds for Scoreplex...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
         
         const scoreplexApiKey = process.env.SCOREPLEX_API_KEY;
         
@@ -739,7 +726,7 @@ app.get('/api/dashboard-data/:sessionId', async (req, res) => {
           console.log('✅ [SCOREPLEX] Results fetched successfully');
 
           // ==========================================
-          // EMAIL INTELLIGENCE - 32 FIELDS
+          // EMAIL INTELLIGENCE
           // ==========================================
           intelligence.email = {
             'email_addresses_amount': report.email_addresses_amount || 0,
@@ -777,13 +764,13 @@ app.get('/api/dashboard-data/:sessionId', async (req, res) => {
           };
 
           // ==========================================
-          // PHONE INTELLIGENCE - 19 FIELDS
+          // ✅✅✅ PHONE INTELLIGENCE FIX #3: Updated mapping with True Caller fallbacks ✅✅✅
           // ==========================================
           intelligence.phone = {
-            'phone_numbers_amount': report.phone_numbers_amount || 0,
+            'phone_numbers_amount': report.phone_numbers_amount || report.sl_data_phones?.length || 0,
             'phone_valid': report.phone_valid || false,
             'phone_associated_emails': report.phone_associated_emails || [],
-            'phone_name': report.phone_name || 'N/A',
+            'phone_name': report.phone_name || report.true_caller_fullname || 'N/A',
             'phone_line_type': report.phone_line_type || 'N/A',
             'phone_recent_abuse': report.phone_recent_abuse || false,
             'phone_spammer': report.phone_spammer || false,
@@ -791,18 +778,18 @@ app.get('/api/dashboard-data/:sessionId', async (req, res) => {
             'phone_prepaid': report.phone_prepaid || false,
             'phone_risky': report.phone_risky || false,
             'phone_active': report.phone_active || false,
-            'phone_country': report.phone_country || 'N/A',
-            'phone_city': report.phone_city || 'N/A',
+            'phone_country': report.phone_country || report.true_caller_country_code || 'N/A',
+            'phone_city': report.phone_city || report.true_caller_city || 'N/A',
             'phone_region': report.phone_region || 'N/A',
-            'phone_zip_code': report.phone_zip_code || 'N/A',
-            'phone_timezone': report.phone_timezone || 'N/A',
+            'phone_zip_code': report.phone_zip_code || report.true_caller_zipcode || 'N/A',
+            'phone_timezone': report.phone_timezone || report.true_caller_timezone || 'N/A',
             'phone_social_has_profile_picture': report.phone_social_has_profile_picture || false,
-            'phone_carrier': report.phone_carrier || 'N/A',
-            'phone_numbers_list': report.phone_numbers_list || []
+            'phone_carrier': report.phone_carrier || report.true_caller_operator || 'N/A',
+            'phone_numbers_list': report.phone_numbers_list || report.sl_data_phones || []
           };
 
           // ==========================================
-          // IP INTELLIGENCE - 22 FIELDS
+          // IP INTELLIGENCE
           // ==========================================
           intelligence.ip = {
             'ip_hostname': report.ip_hostname || report.ip || 'N/A',
@@ -856,9 +843,6 @@ app.get('/api/dashboard-data/:sessionId', async (req, res) => {
             'phone_data_leaks_last_seen': report.phone_data_leaks_last_seen || 'N/A'
           };
 
-          // ==========================================
-          // OVERALL SCORING
-          // ==========================================
           intelligence.overallScore = report.overall_score || 0;
           intelligence.scoring = {
             overall: report.overall_score || 0,
@@ -869,28 +853,18 @@ app.get('/api/dashboard-data/:sessionId', async (req, res) => {
           };
 
           intelligence.scoreplexData = report;
-          
-          // ❌ REMOVED - Don't set sdkData here again!
-          // It's already set at the beginning
         }
       } catch (scoreplexError) {
         console.error('❌ [SCOREPLEX] Fetch error:', scoreplexError.message);
       }
-    } else {
-      console.warn('⚠️ [SCOREPLEX] No task ID found for this session');
     }
 
-    // ✅ Final logs before sending response
     console.log(`✅ [DASHBOARD] Data prepared for session: ${sessionId}`);
-    console.log(`   - Agent Data: ${session.agentData?.customerName || 'Not available'}`);
-    console.log(`   - SDK Events in session: ${session.sdkData?.length || 0}`);
-    console.log(`   - SDK Events in intelligence: ${intelligence.sdkData?.length || 0}`);
-    console.log(`   - Has Distance: ${intelligence.sdkData?.some(e => e.type === 'AGENT_USER_DISTANCE') || false}`);
 
     res.json({
       success: true,
       customerData: session.agentData || {},
-      intelligence: intelligence, // ✅ Contains sdkData from session
+      intelligence: intelligence,
       sessionInfo: {
         sessionId: session.sessionId,
         createdAt: session.createdAt,
@@ -909,11 +883,8 @@ app.get('/api/dashboard-data/:sessionId', async (req, res) => {
   }
 });
 
-
-
-
 // ==========================================
-// ✅ NEW: SAVE AGENT DATA (CUSTOMER INFO FROM FORM)
+// ✅ SAVE AGENT DATA
 // ==========================================
 app.post('/api/save-agent-data', (req, res) => {
   try {
@@ -957,6 +928,63 @@ app.post('/api/save-agent-data', (req, res) => {
 });
 
 // ==========================================
+// 🧪 TEST SCOREPLEX ENDPOINT
+// ==========================================
+app.get('/api/test-scoreplex/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const session = sessions[sessionId];
+    
+    if (!session || !session.scoreplexTaskId) {
+      return res.json({ error: 'No Scoreplex task found' });
+    }
+    
+    console.log('🧪 [TEST] Fetching Scoreplex report...');
+    
+    const scoreplexApiKey = process.env.SCOREPLEX_API_KEY;
+    
+    const scoreplexResponse = await axios.get(
+      `https://api.scoreplex.io/api/v1/search/task/${session.scoreplexTaskId}`,
+      {
+        params: {
+          api_key: scoreplexApiKey,
+          report: true
+        }
+      }
+    );
+    
+    const report = scoreplexResponse.data.report;
+    
+    console.log('📦 [FULL REPORT]:', JSON.stringify(report, null, 2));
+    
+    res.json({
+      success: true,
+      taskId: session.scoreplexTaskId,
+      reportKeys: Object.keys(report),
+      fullReport: report,
+      phoneFields: {
+        phone: report.phone,
+        phone_valid: report.phone_valid,
+        phone_active: report.phone_active,
+        phone_line_type: report.phone_line_type,
+        phone_carrier: report.phone_carrier,
+        phone_country: report.phone_country,
+        phone_city: report.phone_city,
+        phone_region: report.phone_region,
+        true_caller_fullname: report.true_caller_fullname,
+        true_caller_city: report.true_caller_city,
+        true_caller_operator: report.true_caller_operator
+      },
+      customerData: session.agentData
+    });
+    
+  } catch (error) {
+    console.error('❌ [TEST] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
 // START SERVER
 // ==========================================
 app.listen(PORT, () => {
@@ -965,7 +993,6 @@ app.listen(PORT, () => {
   console.log('===========================================');
   console.log(`📡 Server running on: http://localhost:${PORT}`);
   console.log(`✅ API key secured in environment variables`);
-  console.log(`🔒 API key will NOT be exposed to frontend`);
   console.log('===========================================');
   console.log('Available endpoints:');
   console.log(`  GET  http://localhost:${PORT}/api`);
@@ -976,6 +1003,7 @@ app.listen(PORT, () => {
   console.log(`  POST http://localhost:${PORT}/api/save-sdk-data`);
   console.log(`  GET  http://localhost:${PORT}/api/check-verification/:sessionId`);
   console.log(`  GET  http://localhost:${PORT}/api/dashboard-data/:sessionId`);
+  console.log(`  GET  http://localhost:${PORT}/api/test-scoreplex/:sessionId`);
   console.log('===========================================');
 });
 
