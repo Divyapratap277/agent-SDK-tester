@@ -39,16 +39,16 @@ const IntelligenceDashboard = ({ intelligence, customerData, sessionInfo }) => {
   };
 
   // Count statistics for top cards
-  const getStatistics = () => {
-    return {
-      accounts: intelligence.darknet?.sl_data?.accounts?.length || 0,
-      names: intelligence.darknet?.sl_data?.full_names?.length || 0,
-      emails: intelligence.darknet?.sl_data?.emails?.length || 0,
-      phoneNumbers: intelligence.darknet?.sl_data?.phones?.length || 0,
-      locations: 0, // Will be calculated from data
-      aliases: intelligence.darknet?.sl_data?.aliases?.length || 0
-    };
+ const getStatistics = () => {
+  return {
+    accounts: intelligence.data_leaks?.sl_data?.accounts?.length || 0,
+    names: intelligence.data_leaks?.sl_data?.fullnames?.length || 0,  // ✅ Changed: full_names → fullnames
+    emails: intelligence.data_leaks?.sl_data?.emails?.length || 0,
+    phoneNumbers: intelligence.data_leaks?.sl_data?.phones?.length || 0,
+    locations: 0,
+    aliases: intelligence.data_leaks?.sl_data?.aliases?.length || 0
   };
+};
 
   const stats = getStatistics();
 
@@ -58,7 +58,7 @@ const IntelligenceDashboard = ({ intelligence, customerData, sessionInfo }) => {
     { id: 'phone', icon: '📱', label: 'Phone Intelligence', count: 19 },
     { id: 'ip', icon: '🌐', label: 'IP Intelligence', count: 22 },
     { id: 'darknet', icon: '🕵️', label: 'Darknet & Data Leaks', count: null },
-    { id: 'social', icon: '🌐', label: 'Social Media', count: null }, // ✅ ADD THIS LINE
+    // { id: 'social', icon: '🌐', label: 'Social Media', count: null }, // ✅ ADD THIS LINE
     { id: 'sdk', icon: '📲', label: 'SDK Data', count: null }, // NEW!
     { id: 'overview', icon: '📊', label: 'Risk Overview', count: null }
   ];
@@ -512,19 +512,20 @@ const IntelligenceDashboard = ({ intelligence, customerData, sessionInfo }) => {
           <h3 className="card-header">Data Leak Summary</h3>
           <div className="card-rows">
             <div className="data-row">
-              <span className="label">Data Leak – Number of Breaches</span>
-              <span className={`value-count ${intelligence.darknet.data_leaks_count > 0 ? 'count-danger' : ''}`}>
-                {intelligence.darknet.data_leaks_count || 0}
-              </span>
-            </div>
-            <div className="data-row">
-              <span className="label">Data Leak – First Seen Date</span>
-              {renderValue(intelligence.darknet.data_leaks_first_seen)}
-            </div>
-            <div className="data-row">
-              <span className="label">Data Leak – Last Seen Date</span>
-              {renderValue(intelligence.darknet.data_leaks_last_seen)}
-            </div>
+  <span className="label">Data Leak – Number of Breaches</span>
+  <span className={`value-count ${intelligence.data_leaks?.report?.data_leaks_count > 0 ? 'count-danger' : ''}`}>
+    {intelligence.data_leaks?.report?.data_leaks_count || 0}
+  </span>
+</div>
+<div className="data-row">
+  <span className="label">Data Leak – First Seen Date</span>
+  {renderValue(intelligence.data_leaks?.report?.data_leaks_first_seen)}
+</div>
+<div className="data-row">
+  <span className="label">Data Leak – Last Seen Date</span>
+  {renderValue(intelligence.data_leaks?.report?.data_leaks_last_seen)}
+</div>
+
           </div>
         </div>
 
@@ -533,19 +534,20 @@ const IntelligenceDashboard = ({ intelligence, customerData, sessionInfo }) => {
           <h3 className="card-header">Email Data Leaks</h3>
           <div className="card-rows">
             <div className="data-row">
-              <span className="label">Email - Data Leaks Count</span>
-              <span className={`value-count ${intelligence.darknet.email_data_leaks_count > 0 ? 'count-danger' : ''}`}>
-                {intelligence.darknet.email_data_leaks_count || 0}
-              </span>
-            </div>
-            <div className="data-row">
-              <span className="label">Email - Leaks First Seen</span>
-              {renderValue(intelligence.darknet.email_data_leaks_first_seen)}
-            </div>
-            <div className="data-row">
-              <span className="label">Email - Leaks Last Seen</span>
-              {renderValue(intelligence.darknet.email_data_leaks_last_seen)}
-            </div>
+  <span className="label">Email - Data Leaks Count</span>
+  <span className={`value-count ${intelligence.data_leaks?.report?.email_data_leaks_count > 0 ? 'count-danger' : ''}`}>
+    {intelligence.data_leaks?.report?.email_data_leaks_count || 0}
+  </span>
+</div>
+<div className="data-row">
+  <span className="label">Email - Leaks First Seen</span>
+  {renderValue(intelligence.data_leaks?.report?.email_data_leaks_first_seen)}
+</div>
+<div className="data-row">
+  <span className="label">Email - Leaks Last Seen</span>
+  {renderValue(intelligence.data_leaks?.report?.email_data_leaks_last_seen)}
+</div>
+
           </div>
         </div>
 
@@ -553,20 +555,21 @@ const IntelligenceDashboard = ({ intelligence, customerData, sessionInfo }) => {
         <div className="content-card">
           <h3 className="card-header">Phone Data Leaks</h3>
           <div className="card-rows">
-            <div className="data-row">
-              <span className="label">Phone No - Data Leaks Count</span>
-              <span className={`value-count ${intelligence.darknet.phone_data_leaks_count > 0 ? 'count-danger' : ''}`}>
-                {intelligence.darknet.phone_data_leaks_count || 0}
-              </span>
-            </div>
-            <div className="data-row">
-              <span className="label">Phone No - First Seen Data Leaks</span>
-              {renderValue(intelligence.darknet.phone_data_leaks_first_seen)}
-            </div>
-            <div className="data-row">
-              <span className="label">Phone No - Last Seen Data Leaks</span>
-              {renderValue(intelligence.darknet.phone_data_leaks_last_seen)}
-            </div>
+           <div className="data-row">
+  <span className="label">Phone No - Data Leaks Count</span>
+  <span className={`value-count ${intelligence.data_leaks?.report?.phone_data_leaks_count > 0 ? 'count-danger' : ''}`}>
+    {intelligence.data_leaks?.report?.phone_data_leaks_count || 0}
+  </span>
+</div>
+<div className="data-row">
+  <span className="label">Phone No - First Seen Data Leaks</span>
+  {renderValue(intelligence.data_leaks?.report?.phone_data_leaks_first_seen)}
+</div>
+<div className="data-row">
+  <span className="label">Phone No - Last Seen Data Leaks</span>
+  {renderValue(intelligence.data_leaks?.report?.phone_data_leaks_last_seen)}
+</div>
+
           </div>
         </div>
 
@@ -575,37 +578,38 @@ const IntelligenceDashboard = ({ intelligence, customerData, sessionInfo }) => {
           <h3 className="card-header">Darknet Profile Information</h3>
           <div className="card-rows">
             <div className="data-row">
-              <span className="label">Darknet - Phone Numbers</span>
-              {renderValue(intelligence.darknet.sl_data?.phones?.length || 0, 'count')}
-            </div>
-            <div className="data-row">
-              <span className="label">Darknet - Emails</span>
-              {renderValue(intelligence.darknet.sl_data?.emails?.length || 0, 'count')}
-            </div>
-            <div className="data-row">
-              <span className="label">Darknet - Full Names</span>
-              {renderValue(intelligence.darknet.sl_data?.full_names?.length || 0, 'count')}
-            </div>
-            <div className="data-row">
-              <span className="label">Darknet - Aliases</span>
-              {renderValue(intelligence.darknet.sl_data?.aliases?.length || 0, 'count')}
-            </div>
-            <div className="data-row">
-              <span className="label">Darknet - Accounts</span>
-              {renderValue(intelligence.darknet.sl_data?.accounts?.length || 0, 'count')}
-            </div>
-            <div className="data-row">
-              <span className="label">Darknet - Addresses</span>
-              {renderValue(intelligence.darknet.sl_data?.addresses?.length || 0, 'count')}
-            </div>
-            <div className="data-row">
-              <span className="label">Darknet - Gender</span>
-              {renderValue(intelligence.darknet.sl_data?.genders)}
-            </div>
-            <div className="data-row">
-              <span className="label">Darknet - Date of Birth</span>
-              {renderValue(intelligence.darknet.sl_data?.birthdays)}
-            </div>
+  <span className="label">Darknet - Phone Numbers</span>
+  {renderValue(intelligence.data_leaks?.sl_data?.phones?.length || 0, 'count')}
+</div>
+<div className="data-row">
+  <span className="label">Darknet - Emails</span>
+  {renderValue(intelligence.data_leaks?.sl_data?.emails?.length || 0, 'count')}
+</div>
+<div className="data-row">
+  <span className="label">Darknet - Full Names</span>
+  {renderValue(intelligence.data_leaks?.sl_data?.fullnames?.length || 0, 'count')}
+</div>
+<div className="data-row">
+  <span className="label">Darknet - Aliases</span>
+  {renderValue(intelligence.data_leaks?.sl_data?.aliases?.length || 0, 'count')}
+</div>
+<div className="data-row">
+  <span className="label">Darknet - Accounts</span>
+  {renderValue(intelligence.data_leaks?.sl_data?.accounts?.length || 0, 'count')}
+</div>
+<div className="data-row">
+  <span className="label">Darknet - Addresses</span>
+  {renderValue(intelligence.data_leaks?.sl_data?.addresses?.length || 0, 'count')}
+</div>
+<div className="data-row">
+  <span className="label">Darknet - Gender</span>
+  {renderValue(intelligence.data_leaks?.sl_data?.genders)}
+</div>
+<div className="data-row">
+  <span className="label">Darknet - Date of Birth</span>
+  {renderValue(intelligence.data_leaks?.sl_data?.birthdays)}
+</div>
+
           </div>
         </div>
       </div>
@@ -617,7 +621,8 @@ const IntelligenceDashboard = ({ intelligence, customerData, sessionInfo }) => {
 const renderSocialMedia = () => {
   console.log('🚀 [SOCIAL] === FULL DEBUG MODE ===');
   
-  const slData = intelligence?.darknet?.sl_data || {};
+  const slData = intelligence?.data_leaks?.sl_data || {};
+
   
   // Show EVERYTHING in sl_data
   console.log('🔍 [FULL sl_data]:', slData);
@@ -1065,10 +1070,11 @@ const renderSocialMedia = () => {
               <span className="risk-icon">{intelligence.ip.ip_vpn || intelligence.ip.ip_proxy ? '⚠️' : '✅'}</span>
               <span>VPN/Proxy</span>
             </div>
-            <div className={`risk-indicator ${intelligence.darknet.data_leaks_count > 0 ? 'risk-high' : 'risk-safe'}`}>
-              <span className="risk-icon">{intelligence.darknet.data_leaks_count > 0 ? '⚠️' : '✅'}</span>
-              <span>Data Leaks</span>
-            </div>
+            <div className={`risk-indicator ${intelligence.data_leaks?.report?.data_leaks_count > 0 ? 'risk-high' : 'risk-safe'}`}>
+  <span className="risk-icon">{intelligence.data_leaks?.report?.data_leaks_count > 0 ? '⚠️' : '✅'}</span>
+  <span>Data Leaks</span>
+</div>
+
           </div>
         </div>
       </div>
